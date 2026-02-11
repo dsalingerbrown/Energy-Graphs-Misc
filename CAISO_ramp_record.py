@@ -31,22 +31,22 @@ SUPPLY_ORDER = [
 ]
 
 COLOR_MAP = {
-    'Renewables': '#54a24b',       # Green
-    'Solar': '#f28e2b',            # Orange
-    'Wind': '#4e79a7',             # Blue
-    'Natural gas': '#d37295',      # Rust/Pinkish 
-    'Large hydro': '#499894',      # Teal
-    'Small hydro': '#86bcb6',      # Light Teal
-    'Nuclear': '#e15759',          # Red
-    'Coal': '#000000',             # Black
-    'Imports': '#9d7660',          # Brown
-    'Batteries': '#5e4fa2',        # Purple
-    'Biomass': '#bab0ac',          # Grey
-    'Geothermal': '#59a14f',       # Green
-    'Biogas': '#ff9da7',           # Light Pink
-    'Other': '#d7d7d7',            # Light Grey
-    'Demand': '#499894',           # Teal Line
-    'Net demand': '#5e4fa2',       # Dark Purple Line/Area
+    'Renewables': '#54a24b',
+    'Solar': '#f28e2b',
+    'Wind': '#4e79a7',
+    'Natural gas': '#d37295', 
+    'Large hydro': '#499894',
+    'Small hydro': '#86bcb6',
+    'Nuclear': '#e15759',
+    'Coal': '#000000',
+    'Imports': '#9d7660',
+    'Batteries': '#5e4fa2',
+    'Biomass': '#bab0ac',
+    'Geothermal': '#59a14f',
+    'Biogas': '#ff9da7',
+    'Other': '#d7d7d7',
+    'Demand': '#499894',
+    'Net demand': '#5e4fa2',
     'Day-ahead net forecast': '#bab0ac', 
     'Hour-ahead forecast': '#76b7b2'
 }
@@ -190,9 +190,46 @@ def plot_imports(df, title, filename):
     
     fig, ax = plt.subplots(figsize=FIG_SIZE)
     ax.plot(range(len(df)), df[col_name], color=COLOR_MAP['Imports'], linewidth=2.5, label='Imports')
+    ax.axhline(0, color='black', linewidth=1)
     
     format_plot(ax, title, "Megawatts (MW)", len(df))
+    
+    y_min = df[col_name].min()
+    standard_ticks = [i for i in range(-4000, 12001, 2000)]
+    if -1000 not in standard_ticks:
+        standard_ticks.append(-1000)
+    standard_ticks.sort()
+    
+    ax.set_yticks(standard_ticks)
+    ax.set_ylim(bottom=-2000 if y_min > -2000 else y_min * 1.1)
+
     plt.subplots_adjust(right=0.75)
+    plt.savefig(filename, dpi=DPI)
+    plt.close()
+    print(f"✅ Generated: {filename}")
+
+def plot_natural_gas(df, title, filename):
+    """Generates a line graph for Natural Gas generation without redundant legend."""
+    if df is None: return
+    df = df.apply(pd.to_numeric, errors='coerce') # Remove fillna(0) here to catch real missing data
+    
+    if 'Natural gas' not in df.columns:
+        print(f"⚠️ 'Natural gas' column not found in data.")
+        return
+
+    # --- FIX: Drop missing data (like the 24:00 mark) so it doesn't plot as zero ---
+    gas_data = df['Natural gas'].dropna()
+    
+    fig, ax = plt.subplots(figsize=FIG_SIZE)
+    
+    # Use the length of the cleaned data for the x-axis range
+    ax.plot(range(len(gas_data)), gas_data, color=COLOR_MAP['Natural gas'], linewidth=2.5)
+    
+    # We still use the original df length for format_plot to keep the 0-24 labels consistent
+    format_plot(ax, title, "Generation (MW)", len(df))
+    
+    # Legend removed per request
+    
     plt.savefig(filename, dpi=DPI)
     plt.close()
     print(f"✅ Generated: {filename}")
@@ -201,21 +238,27 @@ def plot_imports(df, title, filename):
 def main():
     print("--- Starting Graph Generation ---")
     
-    # Titles updated with "CA" prefix
-    plot_supply_trend(load_and_transpose_data(FILES['supply']), 
-                      "CA Supply Trend (Oct 5, 2025)", "1_Supply_Trend.png")
+    # Load supply once to use for multiple graphs
+    supply_df = load_and_transpose_data(FILES['supply'])
+    
+    plot_supply_trend(supply_df, 
+                      "CAISO Supply (Oct 5, 2025)", "1_Supply.png")
 
     plot_renewables(load_and_transpose_data(FILES['renewables']), 
-                      "CA Renewables Trend (Oct 5, 2025)", "2_Renewables_Trend.png")
+                      "CAISO Renewables (Oct 5, 2025)", "2_Renewables.png")
 
     plot_net_demand(load_and_transpose_data(FILES['net_demand']), 
-                      "CA Net Demand Trend (Oct 5, 2025)", "3_Net_Demand.png")
+                      "CAISO Demand and Net Demand (Oct 5, 2025)", "3_Net_Demand.png")
 
     plot_batteries(load_and_transpose_data(FILES['batteries']), 
-                      "CA Batteries Trend (Oct 5, 2025)", "4_Batteries.png")
+                      "CAISO Batteries (Oct 5, 2025)", "4_Batteries.png")
 
     plot_imports(load_and_transpose_data(FILES['imports']), 
-                      "CA Imports Trend (Oct 5, 2025)", "5_Imports.png")
+                      "CAISO Imports (Oct 5, 2025)", "5_Imports.png")
+
+    # New Natural Gas Generation Graph
+    plot_natural_gas(supply_df, 
+                      "CAISO Natural Gas Generation (Oct 5, 2025)", "6_Natural_Gas.png")
     
     print("--- All Graphs Completed ---")
 
