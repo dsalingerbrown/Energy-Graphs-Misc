@@ -8,7 +8,7 @@ df = pd.read_csv(file_path, skiprows=4)
 df = df.rename(columns={df.columns[0]: 'Date'})
 df['Date'] = pd.to_datetime(df['Date'].str.replace('M', '-'), errors='coerce')
 
-oil_col = 'Crude oil, Brent'
+oil_col = 'Crude oil, WTI'
 coal_col = 'Coal, Australian'
 gas_col = 'Natural gas, US'
 
@@ -44,7 +44,7 @@ def plot_fuels(ax):
     label_date = first_date - pd.DateOffset(months=4)
     
     # OIL: Sits slightly above its line
-    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.1, 'Crude Oil (Brent) ', 
+    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.1, 'Crude Oil (WTI) ', 
             color=color_oil, fontweight='bold', ha='right', va='bottom', fontsize=12)
     
     # GAS: Sits slightly above its line
