@@ -70,11 +70,11 @@ def plot_fuels(ax):
     label_date = first_date - pd.DateOffset(months=4)
     
     # OIL: Sits slightly above its line
-    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.1, 'Fuel Oil (Avg Resid/Dist) ', 
+    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.1, 'Oil', 
             color=color_oil, fontweight='bold', ha='right', va='bottom', fontsize=12)
     
     # GAS: Sits slightly above its line
-    ax.text(label_date, df_filtered['Gas_MMBtu'].iloc[0] + 0.8, 'Natural Gas ', 
+    ax.text(label_date, df_filtered['Gas_MMBtu'].iloc[0] + 0.2, 'Natural Gas ', 
             color=color_gas, fontweight='bold', ha='right', va='top', fontsize=12)
     
     # COAL: Sits centered at its line
@@ -86,7 +86,7 @@ def plot_fuels(ax):
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
     
     # Limit to provide a clear margin for the text
-    ax.set_xlim(left=pd.Timestamp('1995-01-01'), right=df_filtered['Date'].max() + pd.DateOffset(months=6))
+    ax.set_xlim(left=pd.Timestamp('1997-01-01'), right=df_filtered['Date'].max() + pd.DateOffset(months=6))
     
     # Hide all year labels before 2000
     plt.draw() 
