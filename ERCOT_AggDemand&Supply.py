@@ -6,8 +6,8 @@ import re
 # 1. CONFIGURATION: Set your targets and files
 # ==========================================
 TARGET_DATE = '1/15/2026'  
-TARGET_HOUR = 8  
-TARGET_SCED_TIMESTAMP = '01/15/2026 07:55:00' 
+TARGET_HOUR = 19 
+TARGET_SCED_TIMESTAMP = '01/15/2026 18:55:00' 
 
 # DAM File Names
 FILE_DAM_BIDS = '/Users/dannysalingerbrown/Downloads/March16DAM_60Day/60d_DAM_EnergyBids-16-MAR-26.csv'
@@ -88,9 +88,9 @@ def plot_dam():
     gen_offers_df = pd.read_csv(FILE_DAM_GEN)
     gen_filtered = clean_and_filter(gen_offers_df, TARGET_DATE, TARGET_HOUR)
     # Using the hyphen fallback logic that worked earlier
-    dam_supply_gen = parse_ercot_curve(gen_filtered, mw_keyword='Curve-MW', price_keyword='Curve-Price', is_cumulative=False)
+    dam_supply_gen = parse_ercot_curve(gen_filtered, mw_keyword='Curve-MW', price_keyword='Curve-Price', is_cumulative=True)
     if len(dam_supply_gen) == 0:
-        dam_supply_gen = parse_ercot_curve(gen_filtered, mw_keyword='Curve MW', price_keyword='Curve Price', is_cumulative=False)
+        dam_supply_gen = parse_ercot_curve(gen_filtered, mw_keyword='Curve MW', price_keyword='Curve Price', is_cumulative=True)
     
     if not dam_supply_gen.empty and not dam_supply_eo.empty:
         dam_supply = pd.concat([dam_supply_eo, dam_supply_gen], ignore_index=True)
