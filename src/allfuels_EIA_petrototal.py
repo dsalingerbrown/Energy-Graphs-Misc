@@ -24,10 +24,9 @@ def categorize_fuel(desc):
         return 'Coal'
     elif 'Cost of Natur' in desc:
         return 'Gas'
-    elif 'Cost of Distil' in desc:
-        return 'Distillate'
-    elif 'Cost of Resid' in desc:
-        return 'Residual'
+    # MODIFIED: Look for the total petroleum string instead of distillate/residual
+    elif 'Costs of Total Petroleum' in desc: 
+        return 'Oil'
     return None
 
 df['Fuel'] = df['Description'].apply(categorize_fuel)
@@ -38,10 +37,9 @@ df = df.dropna(subset=['Fuel'])
 # Pivot the table to get dates as rows and fuels as columns
 df_pivot = df.pivot_table(index='Date', columns='Fuel', values='Value', aggfunc='mean').reset_index()
 
-# Calculate the average of Distillate and Residual for the combined Oil price
-df_pivot['Oil_MMBtu'] = df_pivot[['Distillate', 'Residual']].mean(axis=1)
-
 # Standardize column names for the plotting function
+# MODIFIED: Map directly to Oil rather than averaging two different columns
+df_pivot['Oil_MMBtu'] = df_pivot['Oil']
 df_pivot['Coal_MMBtu'] = df_pivot['Coal']
 df_pivot['Gas_MMBtu'] = df_pivot['Gas']
 
@@ -69,7 +67,7 @@ def plot_fuels(ax):
     # We use a standard horizontal offset for Oil and Coal
     label_date = first_date - pd.DateOffset(months=4)
     
-    # NEW: A smaller horizontal offset to shift Natural Gas slightly to the right
+    # A smaller horizontal offset to shift Natural Gas slightly to the right
     label_date_gas = first_date - pd.DateOffset(months=1)
     
     # OIL: Sits slightly above its line
@@ -109,7 +107,8 @@ def plot_fuels(ax):
 plt.figure(figsize=(16, 8)) 
 plot_fuels(plt.gca())
 plt.tight_layout()
-plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_with_spines.png', dpi=300, transparent=True)
+# Note: You might want to update the savefig filenames so they don't overwrite your previous graphs!
+plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_total_oil_with_spines.png', dpi=300, transparent=True)
 plt.show()
 
 # --- GRAPH 2: CLEAN WITHOUT BOX (Y-Spine Kept) ---
@@ -122,5 +121,6 @@ for side in ['top', 'right', 'bottom']:
     ax2.spines[side].set_visible(False)
 
 plt.tight_layout()
-plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_no_spines.png', dpi=300, transparent=True)
+# Note: You might want to update the savefig filenames so they don't overwrite your previous graphs!
+plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_total_oil_no_spines.png', dpi=300, transparent=True)
 plt.show()

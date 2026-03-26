@@ -6,8 +6,8 @@ import re
 # 1. CONFIGURATION: Set your targets and files
 # ==========================================
 TARGET_DATE = '1/15/2026'  
-TARGET_HOUR = 20 
-TARGET_SCED_TIMESTAMP = '01/15/2026 19:55:00' 
+TARGET_HOUR = 21 
+TARGET_SCED_TIMESTAMP = '01/15/2026 20:55:00' 
 
 # DAM File Names
 FILE_DAM_BIDS = '/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/data/March16DAM_60Day/60d_DAM_EnergyBids-16-MAR-26.csv'
@@ -21,18 +21,26 @@ FILE_SCED_GEN = '/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/data/March
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
-def parse_ercot_curve(df, mw_keyword, price_keyword, is_cumulative=True):
+def parse_ercot_curve(df, mw_keyword, price_keyword, is_cumulative=True, limit_keyword=None):
     """Finds paired columns and mathematically converts cumulative ERCOT curves into incremental blocks."""
     mw_cols = [c for c in df.columns if mw_keyword.lower() in c.lower()]
     price_cols = [c for c in df.columns if price_keyword.lower() in c.lower()]
     
     def get_col_num(name):
-        match = re.search(r'\d+', name)
+        match = re.search(r'\d+', name.split('-')[-1])
         return int(match.group()) if match else 0
         
     mw_cols.sort(key=get_col_num)
     price_cols.sort(key=get_col_num)
     
+    limit_col = None
+    if limit_keyword:
+        limit_cols = [c for c in df.columns if limit_keyword.lower() in c.lower()]
+        if limit_cols:
+            limit_col = limit_cols[0]
+            # THE FIX: If ERCOT leaves HSL blank, it means the plant has 0 dispatchable limit!
+            df[limit_col] = pd.to_numeric(df[limit_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+
     parsed_data = []
     prev_mw_col = None
     
@@ -41,13 +49,19 @@ def parse_ercot_curve(df, mw_keyword, price_keyword, is_cumulative=True):
             temp_df = df[[price_col, mw_col]].copy()
             temp_df.columns = ['Price', 'Raw_MW']
             
-            # Clean and force numeric
             temp_df['Raw_MW'] = pd.to_numeric(temp_df['Raw_MW'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
             temp_df['Price'] = pd.to_numeric(temp_df['Price'].astype(str).str.replace(',', ''), errors='coerce')
             
-            # Use cumulative math 
+            if limit_col:
+                temp_df['Raw_MW'] = pd.concat([temp_df['Raw_MW'], df[limit_col]], axis=1).min(axis=1)
+            
             if is_cumulative and prev_mw_col is not None:
-                prev_mw = pd.to_numeric(df[prev_mw_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                prev_mw_raw = pd.to_numeric(df[prev_mw_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                if limit_col:
+                    prev_mw = pd.concat([prev_mw_raw, df[limit_col]], axis=1).min(axis=1)
+                else:
+                    prev_mw = prev_mw_raw
+                    
                 temp_df['MW'] = temp_df['Raw_MW'] - prev_mw
             else:
                 temp_df['MW'] = temp_df['Raw_MW']
@@ -64,7 +78,6 @@ def parse_ercot_curve(df, mw_keyword, price_keyword, is_cumulative=True):
     return pd.concat(parsed_data, ignore_index=True)
 
 def clean_and_filter(df, target_date, target_hour):
-    """Bulletproofs the Date and Hour columns before filtering."""
     df.columns = df.columns.str.strip()
     df['Delivery Date'] = pd.to_datetime(df['Delivery Date'])
     df['Hour Ending'] = pd.to_numeric(df['Hour Ending'], errors='coerce')
@@ -85,10 +98,23 @@ def plot_sced():
         print("   -> ERROR: Could not find a Timestamp column.")
         return
         
-    eoc_df = eoc_df[eoc_df[time_col].astype(str).str.startswith(target_minute_str)]
+    minute_df = eoc_df[eoc_df[time_col].astype(str).str.startswith(target_minute_str)].copy()
+    if minute_df.empty:
+        print("   -> ERROR: No data found for this minute.")
+        return
+        
+    exact_timestamp = minute_df[time_col].iloc[0]
+    print(f"   [Locked onto exact SCED run: {exact_timestamp}]")
+    eoc_df = minute_df[minute_df[time_col] == exact_timestamp].copy()
     
-    # Strictly only grab the QSE submitted curves, ignoring Mitigated curves
-    sced_supply = parse_ercot_curve(eoc_df, mw_keyword='SCED1 Curve-MW', price_keyword='SCED1 Curve-Price', is_cumulative=True)
+    # THE FIX: Hard filter to drop purely offline statuses BEFORE math happens
+    status_col = next((col for col in eoc_df.columns if 'Resource Status' in col), None)
+    if status_col:
+        # We drop OFF, OUT, and EMR (Emergency)
+        eoc_df = eoc_df[~eoc_df[status_col].astype(str).str.upper().str.contains(r'OFF|OUT|EMR')]
+        print(f"   [Filtered offline units. Remaining units to plot: {len(eoc_df)}]")
+
+    sced_supply = parse_ercot_curve(eoc_df, mw_keyword='SCED1 Curve-MW', price_keyword='SCED1 Curve-Price', is_cumulative=True, limit_keyword='Telemetered HSL')
     sced_supply = sced_supply.sort_values(by='Price', ascending=True)
     sced_supply['Cumulative_MW'] = sced_supply['MW'].cumsum()
     
@@ -112,20 +138,18 @@ def plot_sced():
     if total_system_demand > 0:
         plt.axvline(x=total_system_demand, color='#d62728', linewidth=2, label=f'System Demand ({total_system_demand:,.0f} MW)')
         
-    plt.title(f'ERCOT SCED Aggregate Curve - {TARGET_SCED_TIMESTAMP}', fontsize=14, fontweight='bold')
+    plt.title(f'ERCOT SCED Aggregate Curve - {exact_timestamp}', fontsize=14, fontweight='bold')
     plt.xlabel('Cumulative Quantity (MW)', fontsize=12)
     plt.ylabel('Price ($/MWh)', fontsize=12)
     plt.grid(True, linestyle=':', alpha=0.6)
     plt.legend(fontsize=11)
     
-    # --- CALCULATE EXACT SCED CLEARING & ADD TEXT BOX ---
     if total_system_demand > 0 and len(sced_supply) > 0:
         clearing_row = sced_supply[sced_supply['Cumulative_MW'] >= total_system_demand]
         if not clearing_row.empty:
             sced_price = clearing_row['Price'].iloc[0]
             print(f"   => ACTUAL SCED CLEARING: {total_system_demand:,.0f} MW at ${sced_price:,.2f} / MWh")
             
-            # Text box configuration
             sced_text = f"Clearing Quantity: {total_system_demand:,.0f} MW\nClearing Price: ${sced_price:,.2f} / MWh"
             bbox_props = dict(boxstyle="round,pad=0.5", fc="white", ec="gray", lw=1.5, alpha=0.9)
             plt.gca().text(0.50, 0.50, sced_text, transform=plt.gca().transAxes, fontsize=12,
@@ -166,13 +190,11 @@ def plot_dam():
         print("   -> ABORTING DAM PLOT: No data left to plot.")
         return
 
-    # 1. Initial Sort to calculate clearing
     dam_demand = dam_demand.sort_values(by='Price', ascending=False)
     dam_demand['Cumulative_MW'] = dam_demand['MW'].cumsum()
     dam_supply = dam_supply.sort_values(by='Price', ascending=True)
     dam_supply['Cumulative_MW'] = dam_supply['MW'].cumsum()
 
-    # 2. Calculate DAM intersection
     print("   [Calculating DAM intersection...]")
     all_prices = sorted(list(set(dam_supply['Price']).union(set(dam_demand['Price']))))
     dam_clearing_price = None
@@ -186,11 +208,9 @@ def plot_dam():
             dam_clearing_mw = d_mw 
             break
             
-    # 3. Plotting (With 0-Anchor Fix)
     plt.figure(figsize=(12, 7))
     
     if len(dam_supply) > 0:
-        # Prepend a 0 to the X axis, and duplicate the first price for the Y axis
         x_sup = [0] + dam_supply['Cumulative_MW'].tolist()
         y_sup = [dam_supply['Price'].iloc[0]] + dam_supply['Price'].tolist()
         plt.step(x_sup, y_sup, where='pre', label='Aggregate Supply (Offers)', color='#1f77b4', linewidth=2)
@@ -206,11 +226,9 @@ def plot_dam():
     plt.grid(True, linestyle=':', alpha=0.6)
     plt.legend(fontsize=11)
     
-    # --- ADD EXACT DAM CLEARING TEXT BOX ---
     if dam_clearing_price is not None:
         print(f"   => ACTUAL DAM CLEARING: {dam_clearing_mw:,.0f} MW at ${dam_clearing_price:,.2f} / MWh")
         
-        # Text box configuration
         dam_text = f"Clearing Quantity: {dam_clearing_mw:,.0f} MW\nClearing Price: ${dam_clearing_price:,.2f} / MWh"
         bbox_props = dict(boxstyle="round,pad=0.5", fc="white", ec="gray", lw=1.5, alpha=0.9)
         plt.gca().text(0.50, 0.50, dam_text, transform=plt.gca().transAxes, fontsize=12,
@@ -224,6 +242,5 @@ def plot_dam():
 # 5. EXECUTE
 # ==========================================
 if __name__ == "__main__":
-    # Execute SCED and DAM independently
     plot_sced()
     plot_dam()
