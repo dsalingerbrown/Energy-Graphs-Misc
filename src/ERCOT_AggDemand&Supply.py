@@ -6,8 +6,8 @@ import re
 # 1. CONFIGURATION: Set your targets and files
 # ==========================================
 TARGET_DATE = '1/15/2026'  
-TARGET_HOUR = 21 
-TARGET_SCED_TIMESTAMP = '01/15/2026 20:55:00' 
+TARGET_HOUR = 16 
+TARGET_SCED_TIMESTAMP = '01/15/2026 15:55:00' 
 
 # DAM File Names
 FILE_DAM_BIDS = '/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/data/March16DAM_60Day/60d_DAM_EnergyBids-16-MAR-26.csv'
