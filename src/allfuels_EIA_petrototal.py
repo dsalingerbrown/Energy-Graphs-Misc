@@ -24,7 +24,6 @@ def categorize_fuel(desc):
         return 'Coal'
     elif 'Cost of Natur' in desc:
         return 'Gas'
-    # MODIFIED: Look for the total petroleum string instead of distillate/residual
     elif 'Costs of Total Petroleum' in desc: 
         return 'Oil'
     return None
@@ -38,7 +37,6 @@ df = df.dropna(subset=['Fuel'])
 df_pivot = df.pivot_table(index='Date', columns='Fuel', values='Value', aggfunc='mean').reset_index()
 
 # Standardize column names for the plotting function
-# MODIFIED: Map directly to Oil rather than averaging two different columns
 df_pivot['Oil_MMBtu'] = df_pivot['Oil']
 df_pivot['Coal_MMBtu'] = df_pivot['Coal']
 df_pivot['Gas_MMBtu'] = df_pivot['Gas']
@@ -49,8 +47,9 @@ df_filtered = df_pivot[df_pivot['Date'] >= '2000-01-01'].copy().dropna(subset=['
 # 3. Plotting Setup
 # Define colors
 color_oil = '#e67e22' 
-color_coal = '#34495e' 
+color_coal = 'black'       
 color_gas = '#2980b9' 
+dark_brown = '#5C4033'     
 
 def plot_fuels(ax):
     # Plotting lines
@@ -58,36 +57,38 @@ def plot_fuels(ax):
     ax.plot(df_filtered['Date'], df_filtered['Coal_MMBtu'], color=color_coal, linewidth=2.5)
     ax.plot(df_filtered['Date'], df_filtered['Gas_MMBtu'], color=color_gas, linewidth=2.5)
     
-    ax.set_ylabel('$/MMBtu', fontsize=20)
+    ax.set_ylabel('$/MMBtu', fontsize=24, color=dark_brown, fontweight='bold')
     ax.set_xlabel('', fontsize=20)
     
     # Labels at the START (Left side)
     first_date = df_filtered['Date'].iloc[0]
     
-    # We use a standard horizontal offset for Oil and Coal
-    label_date = first_date - pd.DateOffset(months=4)
+    # CHANGED: Reduced the offset (from 18 months to 10 months) to move the labels to the right
+    label_date = first_date - pd.DateOffset(months=6)
     
-    # A smaller horizontal offset to shift Natural Gas slightly to the right
-    label_date_gas = first_date - pd.DateOffset(months=1)
+    # OIL
+    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.5, 'Oil', 
+            color=color_oil, fontweight='bold', ha='right', va='bottom', fontsize=20)
     
-    # OIL: Sits slightly above its line
-    ax.text(label_date, df_filtered['Oil_MMBtu'].iloc[0] + 0.1, 'Oil', 
-            color=color_oil, fontweight='bold', ha='right', va='bottom', fontsize=14)
+    # GAS: CHANGED: Shifted higher (y-offset changed from -0.2 to +0.3)
+    ax.text(label_date, df_filtered['Gas_MMBtu'].iloc[0] + 0.3, 'Natural Gas ', 
+            color=color_gas, fontweight='bold', ha='right', va='top', fontsize=20)
     
-    # GAS: Uses the new label_date_gas to sit slightly further right
-    ax.text(label_date_gas, df_filtered['Gas_MMBtu'].iloc[0] + 0.2, 'Natural Gas ', 
-            color=color_gas, fontweight='bold', ha='right', va='top', fontsize=14)
-    
-    # COAL: Sits centered at its line
+    # COAL
     ax.text(label_date, df_filtered['Coal_MMBtu'].iloc[0], 'Coal ', 
-            color=color_coal, fontweight='bold', ha='right', va='center', fontsize=14)
+            color=color_coal, fontweight='bold', ha='right', va='center', fontsize=20)
 
     # X-axis formatting
     ax.xaxis.set_major_locator(mdates.YearLocator(2))
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
     
-    # Limit to provide a clear margin for the text
-    ax.set_xlim(left=pd.Timestamp('1997-01-01'), right=df_filtered['Date'].max() + pd.DateOffset(months=6))
+    # Keep the extended left x-limit to ensure there's room for the buffer
+    ax.set_xlim(left=pd.Timestamp('1995-01-01'), right=df_filtered['Date'].max() + pd.DateOffset(months=6))
+    
+    # Apply the dark brown color to the spines
+    for spine in ax.spines.values():
+        spine.set_color(dark_brown)
+        spine.set_linewidth(1.5) 
     
     # Hide all year labels before 2000
     plt.draw() 
@@ -100,14 +101,14 @@ def plot_fuels(ax):
         except:
             pass
             
-    ax.tick_params(axis='x', rotation=45)
-    ax.tick_params(axis='both', which='major', labelsize=16)
+    # Tick formatting
+    ax.tick_params(axis='x', rotation=45, colors=dark_brown)
+    ax.tick_params(axis='both', which='major', labelsize=20, labelcolor=dark_brown, color=dark_brown)
 
 # --- GRAPH 1: STANDARD WITH BOX ---
 plt.figure(figsize=(16, 8)) 
 plot_fuels(plt.gca())
 plt.tight_layout()
-# Note: You might want to update the savefig filenames so they don't overwrite your previous graphs!
 plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_total_oil_with_spines.png', dpi=300, transparent=True)
 plt.show()
 
@@ -121,6 +122,5 @@ for side in ['top', 'right', 'bottom']:
     ax2.spines[side].set_visible(False)
 
 plt.tight_layout()
-# Note: You might want to update the savefig filenames so they don't overwrite your previous graphs!
 plt.savefig('/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/eia_fuels_total_oil_no_spines.png', dpi=300, transparent=True)
 plt.show()
