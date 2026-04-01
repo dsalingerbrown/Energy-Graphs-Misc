@@ -26,7 +26,6 @@ def build_annual_ercot_sced_matrix(start_date="2025-01-01", end_date="2025-12-31
 
     print("Starting data extraction and aggregation...")
     
-    # Loop through month-by-month to manage memory
     # Loop through in 3-day chunks to prevent Mac memory crashes
     while current_date <= end_dt:
         next_chunk = current_date + pd.Timedelta(days=2)
@@ -86,15 +85,15 @@ def build_annual_ercot_sced_matrix(start_date="2025-01-01", end_date="2025-12-31
         current_date = next_chunk + pd.Timedelta(days=1)
         
         # --- 3. FORCE MEMORY CLEANUP ---
-        # Delete the massive raw dictionaries and dataframes for this month
+        # Delete the massive raw dictionaries and dataframes for this chunk
         del sced_dict
         del df
         # Force the computer to immediately empty the trash and free up RAM
         gc.collect() 
         # --------------------------------
 
-    print("Concatenating monthly data...")
-    # Combine all months into one large DataFrame
+    print("Concatenating data...")
+    # Combine all chunks into one large DataFrame
     full_hourly = pd.concat(hourly_master_list, ignore_index=True)
     
     print("Pivoting data to final matrix format...")
@@ -106,8 +105,9 @@ def build_annual_ercot_sced_matrix(start_date="2025-01-01", end_date="2025-12-31
     print("Done!")
 
 if __name__ == "__main__":
-    # Point the target_csv directly to the file you just created
     build_annual_ercot_sced_matrix(
+        start_date="2025-01-01",
+        end_date="2025-12-31",
         target_csv="/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/data/target_ercot_renewables.csv",
-        output_csv="/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/src/ercot_hourly_output_2025.csv"
+        output_csv="/Users/dannysalingerbrown/Desktop/Energy-Graphs-Misc/data/ercot_hourly_output_2025.csv"
     )
